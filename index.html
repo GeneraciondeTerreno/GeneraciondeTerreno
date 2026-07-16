@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Zonificador de Terrenos — Vivienda 1 Piso</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<style>
+  :root{
+    --bg:#12161c; --panel:#1a1f27; --panel2:#20262f; --line:#2c3340;
+    --text:#e7ebef; --muted:#8b95a3; --accent:#4fd1c5; --accent2:#f2b544; --danger:#e5636b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden;}
+  #mapPane{flex:1; position:relative;}
+  #map{width:100%; height:100%; background:#0d1116;}
+  #searchBox{position:absolute; top:12px; left:12px; z-index:1000; display:flex; gap:6px;}
+  #searchBox input{width:260px; padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:13px;}
+  #searchBox button{padding:8px 12px; border:none; border-radius:6px; background:var(--accent); color:#0b1013; font-weight:600; cursor:pointer;}
+  #sidebar{width:350px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; padding:18px; gap:14px; overflow-y:auto;}
+  h1{font-size:15px; margin:0; letter-spacing:.5px; color:var(--accent);}
+  h2{font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 8px;}
+  .card{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap;}
+  button.secondary{background:var(--panel2); color:var(--text); border:1px solid var(--line); padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer;}
+  button.danger{background:var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer;}
+  button.primary{background:var(--accent); color:#0b1013; border:none; padding:8px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; width:100%;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  #pointList{list-style:none; margin:0; padding:0; max-height:130px; overflow-y:auto; font-size:12px;}
+  #pointList li{display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--line);}
+  #pointList li:last-child{border-bottom:none;}
+  #pointList .rm{color:var(--danger); cursor:pointer; font-size:12px;}
+  .stat{display:flex; justify-content:space-between; font-size:13px; padding:4px 0;}
+  .stat span:last-child{color:var(--accent2); font-weight:600;}
+  .legend{display:flex; flex-direction:column; gap:6px; font-size:12px;}
+  .legend div{display:flex; align-items:center; gap:8px;}
+  .sw{width:12px; height:12px; border-radius:3px; flex-shrink:0;}
+  #zoneList{font-size:12px; color:var(--muted); line-height:1.6;}
+  small{color:var(--muted); line-height:1.4;}
+  label.field{font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; margin-top:8px;}
+  select, input[type=number]{background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px;}
+</style>
+</head>
+<body>
+
+<div id="mapPane">
+  <div id="searchBox">
+    <input id="searchInput" placeholder="Buscar dirección o lugar...">
+    <button onclick="searchPlace()">Buscar</button>
+  </div>
+  <div id="map"></div>
+</div>
+
+<div id="sidebar">
+  <h1>ZONIFICADOR — VIVIENDA DE 1 PISO</h1>
+  <small>Busca tu ubicación, acércate con zoom y haz clic sobre el mapa para marcar los vértices del terreno, en orden. Con 3+ puntos se cierra el polígono.</small>
+
+  <div class="card">
+    <h2>Puntos (<span id="ptCount">0</span>)</h2>
+    <ul id="pointList"><li style="color:var(--muted)">Sin puntos aún</li></ul>
+    <div class="toolbar" style="margin-top:8px;">
+      <button class="secondary" onclick="undoPoint()">Deshacer último</button>
+      <button class="danger" onclick="clearAll()">Limpiar todo</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Terreno</h2>
+    <div class="stat"><span>Área real</span><span id="areaStat">—</span></div>
+    <div class="stat"><span>Perímetro real</span><span id="perimStat">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Zonificación arquitectónica</h2>
+    <label class="field">Lado de acceso principal (calle)
+      <select id="orientSel">
+        <option value="north">Norte (arriba)</option>
+        <option value="south">Sur (abajo)</option>
+        <option value="east">Este (derecha)</option>
+        <option value="west">Oeste (izquierda)</option>
+      </select>
+    </label>
+    <label class="field">Retiro perimetral / jardín (m)
+      <input type="number" id="setbackInput" value="1.5" min="0" step="0.5">
+    </label>
+    <button class="primary" id="zonifyBtn" disabled onclick="generateZonification()" style="margin-top:10px;">Generar zonificación</button>
+    <div id="zoneList" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Leyenda</h2>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<script>
+const map = L.map('map', {zoomControl:true}).setView([-0.1807, -78.4678], 17);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 21, attribution: '© OpenStreetMap'
+}).addTo(map);
+
+let points = [];
+let markers = [];
+let polygonLayer = null;
+let zoneGeoLayer = null;
+
+// Definición del plan de una vivienda de un piso, como fracciones (u = ancho, v = profundidad,
+// v=0 junto a la calle / acceso, v=1 hacia el fondo del lote).
+const ROOM_PLAN = [
+  {name:'Cocina',                u0:0.00, u1:0.35, v0:0.00, v1:0.45, color:'#f2b544'},
+  {name:'Sala - Comedor',        u0:0.35, u1:1.00, v0:0.00, v1:0.45, color:'#4fd1c5'},
+  {name:'Circulación / Hall',    u0:0.00, u1:1.00, v0:0.45, v1:0.55, color:'#5a6a7a'},
+  {name:'Dormitorios',           u0:0.00, u1:0.60, v0:0.55, v1:1.00, color:'#8b7ee8'},
+  {name:'Baño / Servicios',      u0:0.60, u1:1.00, v0:0.55, v1:0.77, color:'#e5636b'},
+  {name:'Lavandería y Tendido',  u0:0.60, u1:1.00, v0:0.77, v1:1.00, color:'#3fa7d6'},
+];
+const PATIO_COLOR = '#6fbf73';
+
+function searchPlace(){
+  const q = document.getElementById('searchInput').value.trim();
+  if(!q) return;
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
+    .then(r=>r.json())
+    .then(res=>{
+      if(res && res.length>0){
+        const {lat, lon} = res[0];
+        map.setView([parseFloat(lat), parseFloat(lon)], 18);
+      } else { alert('No se encontró el lugar.'); }
+    });
+}
+document.getElementById('searchInput').addEventListener('keydown', e=>{ if(e.key==='Enter') searchPlace(); });
+
+map.on('click', (e)=>{
+  points.push({lat:e.latlng.lat, lng:e.latlng.lng});
+  clearZones();
+  redraw();
+});
+
+function clearZones(){
+  if(zoneGeoLayer){ map.removeLayer(zoneGeoLayer); zoneGeoLayer=null; }
+  document.getElementById('zoneList').innerHTML = '';
+  document.getElementById('legend').innerHTML = '';
+}
+
+function redraw(){
+  markers.forEach(m=>map.removeLayer(m)); markers = [];
+  if(polygonLayer){ map.removeLayer(polygonLayer); polygonLayer=null; }
+
+  points.forEach((p,i)=>{
+    const m = L.circleMarker([p.lat,p.lng], {radius:6, color:'#12161c', weight:2, fillColor:'#f2b544', fillOpacity:1})
+      .bindTooltip(String(i+1), {permanent:true, direction:'top'})
+      .addTo(map);
+    markers.push(m);
+  });
+
+  if(points.length>=2){
+    const latlngs = points.map(p=>[p.lat,p.lng]);
+    polygonLayer = L.polygon(latlngs, {color:'#4fd1c5', weight:2, fillOpacity:0.05, dashArray:'4 4'}).addTo(map);
+  }
+  renderPointList();
+  renderStats();
+}
+
+function renderPointList(){
+  const listEl = document.getElementById('pointList');
+  document.getElementById('ptCount').textContent = points.length;
+  if(points.length===0){ listEl.innerHTML = '<li style="color:var(--muted)">Sin puntos aún</li>'; return; }
+  listEl.innerHTML = '';
+  points.forEach((p,i)=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<span>P${i+1}: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span><span class="rm" onclick="removePoint(${i})">✕</span>`;
+    listEl.appendChild(li);
+  });
+}
+
+function removePoint(i){ points.splice(i,1); clearZones(); redraw(); }
+function undoPoint(){ points.pop(); clearZones(); redraw(); }
+function clearAll(){ points = []; clearZones(); redraw(); }
+
+function toTurfPolygon(pts){
+  const coords = pts.map(p=>[p.lng,p.lat]);
+  coords.push(coords[0]);
+  return turf.polygon([coords]);
+}
+
+function renderStats(){
+  const zonifyBtn = document.getElementById('zonifyBtn');
+  if(points.length>=3){
+    const poly = toTurfPolygon(points);
+    const area = turf.area(poly);
+    let perim = 0;
+    for(let i=0;i<points.length;i++){
+      const a = points[i], b = points[(i+1)%points.length];
+      perim += turf.distance([a.lng,a.lat],[b.lng,b.lat],{units:'meters'});
+    }
+    document.getElementById('areaStat').textContent = area.toFixed(1) + ' m²';
+    document.getElementById('perimStat').textContent = perim.toFixed(1) + ' m';
+    zonifyBtn.disabled = false;
+  } else {
+    document.getElementById('areaStat').textContent = '—';
+    document.getElementById('perimStat').textContent = '—';
+    zonifyBtn.disabled = true;
+  }
+}
+
+// Construye un rectángulo (u0..u1, v0..v1) dentro del bbox, según orientación del acceso.
+function rectPolygon(bbox, orient, u0, u1, v0, v1){
+  const [minX, minY, maxX, maxY] = bbox;
+  function pointAt(u, v){
+    // v=0 -> lado de la calle/acceso ; v=1 -> fondo del lote
+    let x, y;
+    if(orient==='north'){       // calle arriba (y máxima)
+      x = minX + u*(maxX-minX); y = maxY - v*(maxY-minY);
+    } else if(orient==='south'){ // calle abajo (y mínima)
+      x = minX + u*(maxX-minX); y = minY + v*(maxY-minY);
+    } else if(orient==='east'){  // calle a la derecha (x máxima)
+      y = minY + u*(maxY-minY); x = maxX - v*(maxX-minX);
+    } else {                     // west: calle a la izquierda (x mínima)
+      y = minY + u*(maxY-minY); x = minX + v*(maxX-minX);
+    }
+    return [x,y];
+  }
+  const ring = [pointAt(u0,v0), pointAt(u1,v0), pointAt(u1,v1), pointAt(u0,v1), pointAt(u0,v0)];
+  return turf.polygon([ring]);
+}
+
+function generateZonification(){
+  if(points.length<3) return;
+  clearZones();
+
+  const orient = document.getElementById('orientSel').value;
+  const setback = parseFloat(document.getElementById('setbackInput').value) || 0;
+  const mainPoly = toTurfPolygon(points);
+
+  // Retiro perimetral -> huella construible; el anillo restante es patio/jardín real (no rectangular).
+  let footprint = mainPoly;
+  let patioFeature = null;
+  if(setback > 0){
+    try{
+      const eroded = turf.buffer(mainPoly, -setback, {units:'meters'});
+      if(eroded && turf.area(eroded) > 1){
+        footprint = eroded;
+        const diff = turf.difference(mainPoly, footprint);
+        if(diff) patioFeature = diff;
+      }
+    }catch(err){ /* si falla el buffer, se usa el lote completo sin retiro */ }
+  }
+
+  const bbox = turf.bbox(footprint);
+  const zoneListEl = document.getElementById('zoneList');
+  const legendEl = document.getElementById('legend');
+  const features = [];
+
+  ROOM_PLAN.forEach(room=>{
+    const rect = rectPolygon(bbox, orient, room.u0, room.u1, room.v0, room.v1);
+    let clipped = null;
+    try{ clipped = turf.intersect(rect, footprint); }catch(err){ clipped = null; }
+    if(clipped){
+      const areaM2 = turf.area(clipped);
+      if(areaM2 > 0.2){
+        clipped.properties = {name:room.name, color:room.color};
+        features.push(clipped);
+
+        const row = document.createElement('div');
+        row.textContent = `${room.name}: ${areaM2.toFixed(1)} m²`;
+        zoneListEl.appendChild(row);
+
+        const leg = document.createElement('div');
+        leg.innerHTML = `<span class="sw" style="background:${room.color}"></span>${room.name}`;
+        legendEl.appendChild(leg);
+      }
+    }
+  });
+
+  if(patioFeature){
+    const patioAreas = patioFeature.geometry.type === 'MultiPolygon'
+      ? patioFeature.geometry.coordinates.map(c=>turf.area(turf.polygon(c)))
+      : [turf.area(patioFeature)];
+    const totalPatio = patioAreas.reduce((a,b)=>a+b,0);
+    patioFeature.properties = {name:'Patio / Jardín perimetral', color:PATIO_COLOR};
+    features.push(patioFeature);
+
+    const row = document.createElement('div');
+    row.textContent = `Patio / Jardín perimetral: ${totalPatio.toFixed(1)} m²`;
+    zoneListEl.appendChild(row);
+
+    const leg = document.createElement('div');
+    leg.innerHTML = `<span class="sw" style="background:${PATIO_COLOR}"></span>Patio / Jardín perimetral`;
+    legendEl.appendChild(leg);
+  }
+
+  const fc = turf.featureCollection(features);
+  zoneGeoLayer = L.geoJSON(fc, {
+    style: f => ({color:f.properties.color, weight:1.5, fillColor:f.properties.color, fillOpacity:0.5}),
+    onEachFeature: (f, layer) => layer.bindTooltip(f.properties.name, {sticky:true})
+  }).addTo(map);
+}
+
+redraw();
+</script>
+</body>
+</html>
