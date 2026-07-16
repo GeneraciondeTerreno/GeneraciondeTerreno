@@ -2,42 +2,50 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Zonificador de Terrenos — Vivienda 1 Piso</title>
+<title>Zonificador Arquitectónico Avanzado — Vivienda 1 Piso</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
   :root{
-    --bg:#12161c; --panel:#1a1f27; --panel2:#20262f; --line:#2c3340;
-    --text:#e7ebef; --muted:#8b95a3; --accent:#4fd1c5; --accent2:#f2b544; --danger:#e5636b;
+    --bg:#0f1319; --panel:#161b22; --panel2:#21262d; --line:#30363d;
+    --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --accent2:#f2cc60; --danger:#f85149;
   }
   *{box-sizing:border-box;}
-  body{margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden;}
+  body{margin:0; font-family:'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden;}
   #mapPane{flex:1; position:relative;}
-  #map{width:100%; height:100%; background:#0d1116;}
+  #map{width:100%; height:100%; background:#0d1117;}
   #searchBox{position:absolute; top:12px; left:12px; z-index:1000; display:flex; gap:6px;}
   #searchBox input{width:260px; padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:13px;}
-  #searchBox button{padding:8px 12px; border:none; border-radius:6px; background:var(--accent); color:#0b1013; font-weight:600; cursor:pointer;}
-  #sidebar{width:350px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; padding:18px; gap:14px; overflow-y:auto;}
-  h1{font-size:15px; margin:0; letter-spacing:.5px; color:var(--accent);}
-  h2{font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 8px;}
+  #searchBox button{padding:8px 12px; border:none; border-radius:6px; background:var(--accent); color:#0d1117; font-weight:600; cursor:pointer;}
+  #sidebar{width:370px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; padding:18px; gap:14px; overflow-y:auto;}
+  h1{font-size:14px; margin:0; letter-spacing:.5px; color:var(--accent); text-transform:uppercase;}
+  h2{font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 8px;}
   .card{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;}
   .toolbar{display:flex; gap:8px; flex-wrap:wrap;}
-  button.secondary{background:var(--panel2); color:var(--text); border:1px solid var(--line); padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer;}
-  button.danger{background:var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; font-size:13px; cursor:pointer;}
-  button.primary{background:var(--accent); color:#0b1013; border:none; padding:8px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; width:100%;}
-  button:disabled{opacity:.4; cursor:not-allowed;}
-  #pointList{list-style:none; margin:0; padding:0; max-height:130px; overflow-y:auto; font-size:12px;}
-  #pointList li{display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--line);}
+  button.secondary{background:var(--panel); color:var(--text); border:1px solid var(--line); padding:8px 12px; border-radius:6px; font-size:12px; cursor:pointer;}
+  button.danger{background:var(--danger); color:#fff; border:none; padding:8px 12px; border-radius:6px; font-size:12px; cursor:pointer;}
+  button.primary{background:var(--accent); color:#0d1117; border:none; padding:10px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; width:100%;}
+  button:disabled{opacity:.3; cursor:not-allowed;}
+  #pointList{list-style:none; margin:0; padding:0; max-height:100px; overflow-y:auto; font-size:12px;}
+  #pointList li{display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-bottom:1px solid var(--line);}
   #pointList li:last-child{border-bottom:none;}
-  #pointList .rm{color:var(--danger); cursor:pointer; font-size:12px;}
+  #pointList .rm{color:var(--danger); cursor:pointer;}
   .stat{display:flex; justify-content:space-between; font-size:13px; padding:4px 0;}
   .stat span:last-child{color:var(--accent2); font-weight:600;}
-  .legend{display:flex; flex-direction:column; gap:6px; font-size:12px;}
-  .legend div{display:flex; align-items:center; gap:8px;}
+  
+  /* Cuadro de Áreas de Leyenda */
+  .legend-table{display:flex; flex-direction:column; gap:6px; font-size:12px; margin-top:5px;}
+  .legend-row{display:flex; align-items:center; justify-content:space-between; padding:4px 0;}
+  .legend-label{display:flex; align-items:center; gap:8px;}
   .sw{width:12px; height:12px; border-radius:3px; flex-shrink:0;}
-  #zoneList{font-size:12px; color:var(--muted); line-height:1.6;}
-  small{color:var(--muted); line-height:1.4;}
+  .area-val{font-weight:600; color:var(--accent2);}
+  .area-val.none{color:var(--muted); font-weight:normal;}
+  
+  small{color:var(--muted); line-height:1.4; font-size:11px;}
   label.field{font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; margin-top:8px;}
   select, input[type=number]{background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px;}
 </style>
@@ -53,44 +61,52 @@
 </div>
 
 <div id="sidebar">
-  <h1>ZONIFICADOR — VIVIENDA DE 1 PISO</h1>
-  <small>Busca tu ubicación, acércate con zoom y haz clic sobre el mapa para marcar los vértices del terreno, en orden. Con 3+ puntos se cierra el polígono.</small>
+  <h1>Zonificador de Lotes</h1>
+  <small>Traza el perímetro del terreno haciendo clics ordenados en el mapa. El algoritmo rotará el plano para alinearse óptimamente a la calle.</small>
 
   <div class="card">
-    <h2>Puntos (<span id="ptCount">0</span>)</h2>
-    <ul id="pointList"><li style="color:var(--muted)">Sin puntos aún</li></ul>
+    <h2>Vértices Terreno (<span id="ptCount">0</span>)</h2>
+    <ul id="pointList"><li style="color:var(--muted)">Sin puntos marcados</li></ul>
     <div class="toolbar" style="margin-top:8px;">
-      <button class="secondary" onclick="undoPoint()">Deshacer último</button>
-      <button class="danger" onclick="clearAll()">Limpiar todo</button>
+      <button class="secondary" onclick="undoPoint()">Deshacer</button>
+      <button class="danger" onclick="clearAll()">Limpiar Todo</button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Terreno</h2>
-    <div class="stat"><span>Área real</span><span id="areaStat">—</span></div>
-    <div class="stat"><span>Perímetro real</span><span id="perimStat">—</span></div>
+    <h2>Métricas del Lote</h2>
+    <div class="stat"><span>Área de Terreno</span><span id="areaStat">—</span></div>
+    <div class="stat"><span>Perímetro Real</span><span id="perimStat">—</span></div>
   </div>
 
   <div class="card">
-    <h2>Zonificación arquitectónica</h2>
-    <label class="field">Lado de acceso principal (calle)
-      <select id="orientSel">
-        <option value="north">Norte (arriba)</option>
-        <option value="south">Sur (abajo)</option>
-        <option value="east">Este (derecha)</option>
-        <option value="west">Oeste (izquierda)</option>
+    <h2>Parámetros de Diseño</h2>
+    <label class="field">Calle de Acceso (Frente)
+      <select id="orientSel" onchange="generateZonification()">
+        <option value="south" selected>Sur (Calle Abajo)</option>
+        <option value="north">Norte (Calle Arriba)</option>
+        <option value="east">Este (Calle Derecha)</option>
+        <option value="west">Oeste (Calle Izquierda)</option>
       </select>
     </label>
-    <label class="field">Retiro perimetral / jardín (m)
-      <input type="number" id="setbackInput" value="1.5" min="0" step="0.5">
+    <label class="field">Retiro / Jardín Perimetral (m)
+      <input type="number" id="setbackInput" value="1.5" min="0" step="0.5" onchange="generateZonification()">
     </label>
-    <button class="primary" id="zonifyBtn" disabled onclick="generateZonification()" style="margin-top:10px;">Generar zonificación</button>
-    <div id="zoneList" style="margin-top:10px;"></div>
+    <button class="primary" id="zonifyBtn" disabled onclick="generateZonification()" style="margin-top:12px;">Calcular Distribución</button>
   </div>
 
   <div class="card">
-    <h2>Leyenda</h2>
-    <div class="legend" id="legend"></div>
+    <h2>Cuadro de Áreas Útiles</h2>
+    <div class="legend-table" id="legendTable">
+      </div>
+  </div>
+
+  <div class="card">
+    <h2>Descarga de Entregables</h2>
+    <div class="toolbar" style="margin-top:4px;">
+      <button class="secondary" id="dxfBtn" disabled onclick="exportDXF()" style="flex:1;">Descargar DXF (CAD)</button>
+      <button class="secondary" id="pdfBtn" disabled onclick="exportPDF()" style="flex:1;">Exportar PDF</button>
+    </div>
   </div>
 </div>
 
@@ -104,18 +120,50 @@ let points = [];
 let markers = [];
 let polygonLayer = null;
 let zoneGeoLayer = null;
+let currentZones = []; // Almacena las geometrías de las zonas calculadas para exportación
 
-// Definición del plan de una vivienda de un piso, como fracciones (u = ancho, v = profundidad,
-// v=0 junto a la calle / acceso, v=1 hacia el fondo del lote).
-const ROOM_PLAN = [
-  {name:'Cocina',                u0:0.00, u1:0.35, v0:0.00, v1:0.45, color:'#f2b544'},
-  {name:'Sala - Comedor',        u0:0.35, u1:1.00, v0:0.00, v1:0.45, color:'#4fd1c5'},
-  {name:'Circulación / Hall',    u0:0.00, u1:1.00, v0:0.45, v1:0.55, color:'#5a6a7a'},
-  {name:'Dormitorios',           u0:0.00, u1:0.60, v0:0.55, v1:1.00, color:'#8b7ee8'},
-  {name:'Baño / Servicios',      u0:0.60, u1:1.00, v0:0.55, v1:0.77, color:'#e5636b'},
-  {name:'Lavandería y Tendido',  u0:0.60, u1:1.00, v0:0.77, v1:1.00, color:'#3fa7d6'},
+// Estructura espacial arquitectónica (Tripartita y con desfases fluidos)
+// u0, u1 = Límites de ancho (0.0 = Izquierda, 1.0 = Derecha)
+// v0, v1 = Profundidad desde la calle (0.0 = Fachada/Calle, 1.0 = Fondo de lote)
+const ARCHITECTURAL_PLAN = [
+  // Banda Frontal: Social & Acceso directo
+  {id:'sala',       name:'Sala - Comedor',            u0:0.00, u1:0.65, v0:0.00, v1:0.42, color:'#3182ce', dxfColor:1},
+  {id:'cocina',     name:'Cocina Abierta',            u0:0.65, u1:1.00, v0:0.00, v1:0.42, color:'#dd6b20', dxfColor:2},
+  
+  // Banda Central: Servicios, Tragaluz interno de ventilación y Lavandería
+  {id:'pasillo',    name:'Circulación / Distribución', u0:0.30, u1:0.65, v0:0.42, v1:0.60, color:'#718096', dxfColor:9},
+  {id:'lavanderia', name:'Lavandería y Tendido',       u0:0.65, u1:1.00, v0:0.42, v1:0.60, color:'#319795', dxfColor:4},
+  {id:'tragaluz',   name:'Patio de Luz / Tragaluz',   u0:0.00, u1:0.30, v0:0.42, v1:0.60, color:'#4a5568', dxfColor:8},
+  
+  // Banda Posterior: Dormitorios íntimos y baño común
+  {id:'bath',       name:'Baño General Completo',     u0:0.65, u1:1.00, v0:0.60, v1:0.75, color:'#e53e3e', dxfColor:1},
+  {id:'dorm2',      name:'Dormitorio Secundario',     u0:0.00, u1:0.50, v0:0.60, v1:1.00, color:'#805ad5', dxfColor:5},
+  {id:'dorm_prin',  name:'Dormitorio Principal',      u0:0.50, u1:1.00, v0:0.75, v1:1.00, color:'#553c9a', dxfColor:6}
 ];
-const PATIO_COLOR = '#6fbf73';
+
+const PATIO_COLOR = '#38a169';
+
+function initLegendTable() {
+  const table = document.getElementById('legendTable');
+  table.innerHTML = '';
+  ARCHITECTURAL_PLAN.forEach(room => {
+    table.appendChild(createLegendRow(room.color, room.name, room.id, '—'));
+  });
+  table.appendChild(createLegendRow(PATIO_COLOR, 'Patio / Jardín Perimetral', 'patio', '—'));
+}
+
+function createLegendRow(color, name, id, areaStr) {
+  const row = document.createElement('div');
+  row.className = 'legend-row';
+  row.innerHTML = `
+    <div class="legend-label">
+      <span class="sw" style="background:${color}"></span>
+      <span>${name}</span>
+    </div>
+    <span class="area-val" id="area-val-${id}">${areaStr}</span>
+  `;
+  return row;
+}
 
 function searchPlace(){
   const q = document.getElementById('searchInput').value.trim();
@@ -125,8 +173,8 @@ function searchPlace(){
     .then(res=>{
       if(res && res.length>0){
         const {lat, lon} = res[0];
-        map.setView([parseFloat(lat), parseFloat(lon)], 18);
-      } else { alert('No se encontró el lugar.'); }
+        map.setView([parseFloat(lat), parseFloat(lon)], 19);
+      } else { alert('No se localizó la dirección.'); }
     });
 }
 document.getElementById('searchInput').addEventListener('keydown', e=>{ if(e.key==='Enter') searchPlace(); });
@@ -139,8 +187,10 @@ map.on('click', (e)=>{
 
 function clearZones(){
   if(zoneGeoLayer){ map.removeLayer(zoneGeoLayer); zoneGeoLayer=null; }
-  document.getElementById('zoneList').innerHTML = '';
-  document.getElementById('legend').innerHTML = '';
+  currentZones = [];
+  document.getElementById('dxfBtn').disabled = true;
+  document.getElementById('pdfBtn').disabled = true;
+  initLegendTable();
 }
 
 function redraw(){
@@ -148,15 +198,15 @@ function redraw(){
   if(polygonLayer){ map.removeLayer(polygonLayer); polygonLayer=null; }
 
   points.forEach((p,i)=>{
-    const m = L.circleMarker([p.lat,p.lng], {radius:6, color:'#12161c', weight:2, fillColor:'#f2b544', fillOpacity:1})
-      .bindTooltip(String(i+1), {permanent:true, direction:'top'})
+    const m = L.circleMarker([p.lat,p.lng], {radius:5, color:'#0f1319', weight:2, fillColor:'#f2cc60', fillOpacity:1})
+      .bindTooltip(`V${i+1}`, {permanent:true, direction:'top'})
       .addTo(map);
     markers.push(m);
   });
 
   if(points.length>=2){
     const latlngs = points.map(p=>[p.lat,p.lng]);
-    polygonLayer = L.polygon(latlngs, {color:'#4fd1c5', weight:2, fillOpacity:0.05, dashArray:'4 4'}).addTo(map);
+    polygonLayer = L.polygon(latlngs, {color:'#58a6ff', weight:2, fillOpacity:0.03, dashArray:'3 5'}).addTo(map);
   }
   renderPointList();
   renderStats();
@@ -165,11 +215,11 @@ function redraw(){
 function renderPointList(){
   const listEl = document.getElementById('pointList');
   document.getElementById('ptCount').textContent = points.length;
-  if(points.length===0){ listEl.innerHTML = '<li style="color:var(--muted)">Sin puntos aún</li>'; return; }
+  if(points.length===0){ listEl.innerHTML = '<li style="color:var(--muted)">Sin puntos marcados</li>'; return; }
   listEl.innerHTML = '';
   points.forEach((p,i)=>{
     const li = document.createElement('li');
-    li.innerHTML = `<span>P${i+1}: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span><span class="rm" onclick="removePoint(${i})">✕</span>`;
+    li.innerHTML = `<span>V${i+1}: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span><span class="rm" onclick="removePoint(${i})">✕</span>`;
     listEl.appendChild(li);
   });
 }
@@ -204,25 +254,56 @@ function renderStats(){
   }
 }
 
-// Construye un rectángulo (u0..u1, v0..v1) dentro del bbox, según orientación del acceso.
-function rectPolygon(bbox, orient, u0, u1, v0, v1){
-  const [minX, minY, maxX, maxY] = bbox;
-  function pointAt(u, v){
-    // v=0 -> lado de la calle/acceso ; v=1 -> fondo del lote
-    let x, y;
-    if(orient==='north'){       // calle arriba (y máxima)
-      x = minX + u*(maxX-minX); y = maxY - v*(maxY-minY);
-    } else if(orient==='south'){ // calle abajo (y mínima)
-      x = minX + u*(maxX-minX); y = minY + v*(maxY-minY);
-    } else if(orient==='east'){  // calle a la derecha (x máxima)
-      y = minY + u*(maxY-minY); x = maxX - v*(maxX-minX);
-    } else {                     // west: calle a la izquierda (x mínima)
-      y = minY + u*(maxY-minY); x = minX + v*(maxX-minX);
+// Rotación matemática de coordenadas bidimensionales
+function rotateCoords(coords, angle, center) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return coords.map(p => {
+    const dx = p[0] - center[0];
+    const dy = p[1] - center[1];
+    return [
+      center[0] + dx * cos - dy * sin,
+      center[1] + dx * sin + dy * cos
+    ];
+  });
+}
+
+// Algoritmo de Alineación de Frente para Terrenos Diagonales
+function findStreetAngle(poly, orient) {
+  const coords = poly.geometry.coordinates[0];
+  let bestAngle = 0;
+  let maxDot = -Infinity;
+  
+  // Vector objetivo de la orientación elegida
+  const targets = {
+    'south': [0, -1],
+    'north': [0, 1],
+    'east': [1, 0],
+    'west': [-1, 0]
+  };
+  const target = targets[orient];
+
+  for(let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i+1];
+    
+    // Vector del muro
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    
+    // Normal del muro orientada al exterior (asumiendo sentido antihorario de Turf)
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if(len === 0) continue;
+    const nx = dy / len;
+    const ny = -dx / len;
+    
+    const dot = nx * target[0] + ny * target[1];
+    if(dot > maxDot) {
+      maxDot = dot;
+      bestAngle = Math.atan2(dy, dx);
     }
-    return [x,y];
   }
-  const ring = [pointAt(u0,v0), pointAt(u1,v0), pointAt(u1,v1), pointAt(u0,v1), pointAt(u0,v0)];
-  return turf.polygon([ring]);
+  return bestAngle;
 }
 
 function generateZonification(){
@@ -233,9 +314,9 @@ function generateZonification(){
   const setback = parseFloat(document.getElementById('setbackInput').value) || 0;
   const mainPoly = toTurfPolygon(points);
 
-  // Retiro perimetral -> huella construible; el anillo restante es patio/jardín real (no rectangular).
   let footprint = mainPoly;
   let patioFeature = null;
+  
   if(setback > 0){
     try{
       const eroded = turf.buffer(mainPoly, -setback, {units:'meters'});
@@ -244,59 +325,239 @@ function generateZonification(){
         const diff = turf.difference(mainPoly, footprint);
         if(diff) patioFeature = diff;
       }
-    }catch(err){ /* si falla el buffer, se usa el lote completo sin retiro */ }
+    }catch(err){ console.error("Error al calcular el buffer de retiro."); }
   }
 
-  const bbox = turf.bbox(footprint);
-  const zoneListEl = document.getElementById('zoneList');
-  const legendEl = document.getElementById('legend');
+  // Centrar rotación sobre el baricentro del lote
+  const centroid = turf.centroid(footprint).geometry.coordinates;
+  const angle = findStreetAngle(mainPoly, orient);
+
+  // 1. Rotamos la huella hacia atrás (0 grados)
+  const rotatedFootprintCoords = rotateCoords(footprint.geometry.coordinates[0], -angle, centroid);
+  const rotatedFootprint = turf.polygon([rotatedFootprintCoords]);
+  const bbox = turf.bbox(rotatedFootprint);
+  const [minX, minY, maxX, maxY] = bbox;
+
   const features = [];
+  currentZones = [];
 
-  ROOM_PLAN.forEach(room=>{
-    const rect = rectPolygon(bbox, orient, room.u0, room.u1, room.v0, room.v1);
-    let clipped = null;
-    try{ clipped = turf.intersect(rect, footprint); }catch(err){ clipped = null; }
-    if(clipped){
-      const areaM2 = turf.area(clipped);
-      if(areaM2 > 0.2){
-        clipped.properties = {name:room.name, color:room.color};
-        features.push(clipped);
-
-        const row = document.createElement('div');
-        row.textContent = `${room.name}: ${areaM2.toFixed(1)} m²`;
-        zoneListEl.appendChild(row);
-
-        const leg = document.createElement('div');
-        leg.innerHTML = `<span class="sw" style="background:${room.color}"></span>${room.name}`;
-        legendEl.appendChild(leg);
-      }
+  // 2. Ejecutar la distribución de espacios en espacio horizontal ordenado
+  ARCHITECTURAL_PLAN.forEach(room => {
+    // Cálculo proporcional dentro del Bounding Box alineado
+    const rx0 = minX + room.u0 * (maxX - minX);
+    const rx1 = minX + room.u1 * (maxX - minX);
+    const ry0 = minY + room.v0 * (maxY - minY);
+    const ry1 = minY + room.v1 * (maxY - minY);
+    
+    const rectRotated = turf.polygon([[[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1], [rx0, ry0]]]);
+    
+    // Intersectamos dentro de la huella construible rotada
+    let clippedRotated = null;
+    try { clippedRotated = turf.intersect(rectRotated, rotatedFootprint); } catch(e) { clippedRotated = null; }
+    
+    const valEl = document.getElementById(`area-val-${room.id}`);
+    
+    if(clippedRotated && turf.area(clippedRotated) > 0.1) {
+      // 3. Volvemos a rotar a la posición real original del mapa
+      const restoredCoords = rotateCoords(clippedRotated.geometry.coordinates[0], angle, centroid);
+      const restoredFeature = turf.polygon([restoredCoords], {
+        name: room.name, 
+        color: room.color, 
+        dxfColor: room.dxfColor,
+        id: room.id
+      });
+      
+      features.push(restoredFeature);
+      currentZones.push(restoredFeature);
+      
+      const areaM2 = turf.area(restoredFeature);
+      valEl.textContent = `${areaM2.toFixed(1)} m²`;
+      valEl.className = "area-val";
+    } else {
+      valEl.textContent = "No asignado";
+      valEl.className = "area-val none";
     }
   });
 
+  // Procesar Patio y Retiro exterior
+  const patioValEl = document.getElementById('area-val-patio');
   if(patioFeature){
-    const patioAreas = patioFeature.geometry.type === 'MultiPolygon'
-      ? patioFeature.geometry.coordinates.map(c=>turf.area(turf.polygon(c)))
-      : [turf.area(patioFeature)];
-    const totalPatio = patioAreas.reduce((a,b)=>a+b,0);
-    patioFeature.properties = {name:'Patio / Jardín perimetral', color:PATIO_COLOR};
+    const totalPatio = turf.area(patioFeature);
+    patioFeature.properties = {name:'Patio / Jardín Perimetral', color:PATIO_COLOR, dxfColor:3, id:'patio'};
     features.push(patioFeature);
-
-    const row = document.createElement('div');
-    row.textContent = `Patio / Jardín perimetral: ${totalPatio.toFixed(1)} m²`;
-    zoneListEl.appendChild(row);
-
-    const leg = document.createElement('div');
-    leg.innerHTML = `<span class="sw" style="background:${PATIO_COLOR}"></span>Patio / Jardín perimetral`;
-    legendEl.appendChild(leg);
+    currentZones.push(patioFeature);
+    
+    patioValEl.textContent = `${totalPatio.toFixed(1)} m²`;
+    patioValEl.className = "area-val";
+  } else {
+    patioValEl.textContent = "0.0 m²";
+    patioValEl.className = "area-val none";
   }
 
+  // Dibujar en el mapa con estilo translúcido de zonificación
   const fc = turf.featureCollection(features);
   zoneGeoLayer = L.geoJSON(fc, {
-    style: f => ({color:f.properties.color, weight:1.5, fillColor:f.properties.color, fillOpacity:0.5}),
-    onEachFeature: (f, layer) => layer.bindTooltip(f.properties.name, {sticky:true})
+    style: f => ({
+      color: '#161b22', 
+      weight: 1.5, 
+      fillColor: f.properties.color, 
+      fillOpacity: 0.7
+    }),
+    onEachFeature: (f, layer) => {
+      layer.bindTooltip(`<strong>${f.properties.name}</strong>`, {sticky: true, offset: [10, 0]});
+    }
   }).addTo(map);
+
+  document.getElementById('dxfBtn').disabled = false;
+  document.getElementById('pdfBtn').disabled = false;
 }
 
+// ==========================================
+// EXPORTACIÓN EXCLUSIVA A CAD (FORMATO DXF)
+// ==========================================
+function exportDXF() {
+  if (currentZones.length === 0) return;
+
+  // Tomamos como origen métrico (0,0) el primer punto dibujado para facilitar escala en AutoCAD
+  const origin = points[0]; 
+  const latToMeters = 111132; 
+  const lngToMeters = 111319 * Math.cos(origin.lat * Math.PI / 180);
+
+  // Conversión matemática de Lat/Lng a coordenadas cartesianas reales
+  function toLocalMeters(lng, lat) {
+    const x = (lng - origin.lng) * lngToMeters;
+    const y = (lat - origin.lat) * latToMeters;
+    return [x, y];
+  }
+
+  let dxf = [];
+  // Cabecera simplificada de AutoCAD DXF
+  dxf.push("  0", "SECTION", "  2", "HEADER", "  0", "ENDSEC");
+  dxf.push("  0", "SECTION", "  2", "ENTITIES");
+
+  // Exportación del Terreno Base
+  const baseCoords = points.map(p => toLocalMeters(p.lng, p.lat));
+  writePolylineDXF(dxf, baseCoords, "0_TERRENO_BASE", 7); // Blanco/Negro
+
+  // Exportación de cada espacio zonificado
+  currentZones.forEach(zone => {
+    const layerName = `Z_${zone.properties.id.toUpperCase()}`;
+    const color = zone.properties.dxfColor || 7;
+    const coords = zone.geometry.coordinates[0].map(pt => toLocalMeters(pt[0], pt[1]));
+    writePolylineDXF(dxf, coords, layerName, color);
+  });
+
+  dxf.push("  0", "ENDSEC", "  0", "EOF");
+
+  const dxfText = dxf.join("\n");
+  const blob = new Blob([dxfText], {type: "application/dxf"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Zonificacion_Arquitectonica.dxf";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function writePolylineDXF(dxfArray, pts, layerName, colorIndex) {
+  dxfArray.push("  0", "LWPOLYLINE");
+  dxfArray.push("  8", layerName);
+  dxfArray.push(" 62", colorIndex.toString());
+  dxfArray.push(" 90", pts.length.toString());
+  dxfArray.push(" 70", "1"); // Polilínea cerrada
+  
+  pts.forEach(p => {
+    dxfArray.push(" 10", p[0].toFixed(4));
+    dxfArray.push(" 20", p[1].toFixed(4));
+  });
+}
+
+// ==========================================
+// EXPORTACIÓN A PDF (REPORTE DE CLIENTE)
+// ==========================================
+async function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  // Encabezado Técnico
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(15, 23, 42);
+  doc.text("REPORTE DE ZONIFICACIÓN DE TERRENOS", 15, 22);
+  
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()} | Sistema de pre-diseño automático`, 15, 28);
+  
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(15, 31, 195, 31);
+  
+  // Capturar mapa interactivo con html2canvas
+  const mapEl = document.getElementById('map');
+  try {
+    const canvas = await html2canvas(mapEl, { 
+      useCORS: true, 
+      logging: false,
+      allowTaint: false
+    });
+    const imgData = canvas.toDataURL('image/png');
+    doc.addImage(imgData, 'PNG', 15, 36, 180, 105);
+    doc.setDrawColor(148, 163, 184);
+    doc.rect(15, 36, 180, 105);
+  } catch (err) {
+    doc.setFont("Helvetica", "italic");
+    doc.text("[Error al renderizar el mapa interactivo en PDF]", 15, 45);
+  }
+
+  // Bloque de Métricas del Lote
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text("DATOS TÉCNICOS DEL LOTE:", 15, 154);
+  
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Área de Lote: ${document.getElementById('areaStat').textContent}`, 15, 162);
+  doc.text(`Perímetro: ${document.getElementById('perimStat').textContent}`, 15, 168);
+  doc.text(`Acceso Principal: ${document.getElementById('orientSel').selectedOptions[0].text}`, 15, 174);
+  doc.text(`Retiro Perimetral: ${document.getElementById('setbackInput').value} m`, 15, 180);
+
+  // Cuadro de Áreas Útiles
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("CUADRO DE ÁREAS ÚTILES:", 110, 154);
+
+  let yOffset = 162;
+  ARCHITECTURAL_PLAN.forEach(room => {
+    const areaVal = document.getElementById(`area-val-${room.id}`).textContent;
+    doc.setFont("Helvetica", "normal");
+    doc.text(`• ${room.name}:`, 110, yOffset);
+    doc.setFont("Helvetica", "bold");
+    doc.text(areaVal, 168, yOffset);
+    yOffset += 6.2;
+  });
+
+  const patioVal = document.getElementById('area-val-patio').textContent;
+  doc.setFont("Helvetica", "normal");
+  doc.text(`• Patio / Jardín:`, 110, yOffset);
+  doc.setFont("Helvetica", "bold");
+  doc.text(patioVal, 168, yOffset);
+
+  // Pie de Página del Reporte
+  doc.setDrawColor(226, 232, 240);
+  doc.line(15, 272, 195, 272);
+  doc.setFont("Helvetica", "italic");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text("Generado en escala para análisis esquemático. Los archivos vectoriales pueden escalarse en AutoCAD importando el DXF adjunto.", 15, 278);
+
+  doc.save("Reporte_Zonificacion.pdf");
+}
+
+// Inicialización de la UI base
+initLegendTable();
 redraw();
 </script>
 </body>
